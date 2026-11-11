@@ -51,16 +51,31 @@ enum HengeBuiltInJIT {
         if getenv("LC_HOME_PATH") != nil {
             return "Built-in JIT is unavailable inside LiveContainer. Use StikDebug instead."
         }
+        guard helperIdentifier != nil else {
+            return "Henge's JIT helper is missing or incomplete in this installed app. "
+                 + "Your signer may have removed PlugIns/HengeJITHelper.appex or its executable. "
+                 + "Re-sign an IPA that preserves the app extension, or choose StikDebug."
+        }
         return nil
 #endif
     }
 
     static var isAvailable: Bool { unavailableReason == nil }
 
-    /// The helper's bundle identifier in this installation; nil when a sideloader left it out.
+    /// The helper must contain both metadata and its executable. Some sideloaders
+    /// preserve the .appex directory but strip the binary during re-signing.
+    /// In that case the previous check incorrectly reported that JIT was available.
     static var helperIdentifier: String? {
         guard let url = Bundle.main.builtInPlugInsURL?.appendingPathComponent(helperFile) else { return nil }
-        return Bundle(url: url)?.bundleIdentifier
+        let fm = FileManager.default
+        guard fm.fileExists(atPath: url.appendingPathComponent("Info.plist").path),
+              let bundle = Bundle(url: url),
+              let executable = bundle.executableURL,
+              fm.fileExists(atPath: executable.path),
+              let identifier = bundle.bundleIdentifier, !identifier.isEmpty else {
+            return nil
+        }
+        return identifier
     }
 
     static func send(_ request: HengeJITRequest,
