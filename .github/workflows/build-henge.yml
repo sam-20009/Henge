@@ -13,9 +13,12 @@
 
 name: Build Henge IPA
 
-# Manual only (Actions tab > Build Henge IPA > Run workflow): pushes to main don't build an IPA.
+# Build once on the dedicated JIT fix branch; main remains manual only.
 on:
   workflow_dispatch: {}
+  push:
+    branches:
+      - fix/jit-attach-helper-20261110
 
 env:
   HUSK: ${{ github.workspace }}/Husk
