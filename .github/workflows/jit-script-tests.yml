@@ -1,0 +1,22 @@
+name: Henge JIT Protocol Tests
+
+on:
+  push:
+    paths:
+      - "ios/Henge/Resources/henge-jit.js"
+      - "tests/test_henge_jit_script.js"
+      - ".github/workflows/jit-script-tests.yml"
+  pull_request:
+    paths:
+      - "ios/Henge/Resources/henge-jit.js"
+      - "tests/test_henge_jit_script.js"
+      - ".github/workflows/jit-script-tests.yml"
+
+jobs:
+  jit-script:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify debugger protocol behavior
+        run: node tests/test_henge_jit_script.js
