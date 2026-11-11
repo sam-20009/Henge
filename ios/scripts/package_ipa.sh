@@ -54,6 +54,11 @@ fi
 sign() { codesign --force --sign - --timestamp=none "$@"; }
 for fw in "$SAPP"/Frameworks/*.framework; do [ -d "$fw" ] && sign "$fw"; done
 for ex in "$SAPP"/PlugIns/*.appex; do [ -d "$ex" ] && sign "$ex"; done
+# Catch an incomplete or incorrectly signed helper before producing an IPA.
+codesign --verify "$SAPP/PlugIns/HengeJITHelper.appex" || {
+  echo "==> JIT helper signature verification failed; refusing to package" >&2
+  exit 1
+}
 sign --entitlements "$ENT" "$SAPP"
 EMBEDDED=$(codesign -d --entitlements - "$SAPP" 2>&1 || true)
 # Every key the entitlements file asks for must be in the signature.
@@ -62,4 +67,16 @@ for k in $(plutil -convert json -o - "$ENT" | python3 -I -c 'import json, sys; p
 done
 ( cd "$STAGE" && zip -qry "$STAGE/package.tmp" Payload )
 mv -f "$STAGE/package.tmp" "$OUT" # atomic: a half-written IPA never sits where the good one was
+# A build can succeed even when downstream packaging loses an .appex. Verify
+# the final archive, not just the app directory before signing.
+for f in "Payload/Henge.app/PlugIns/HengeJITHelper.appex/Info.plist" \
+         "Payload/Henge.app/PlugIns/HengeJITHelper.appex/HengeJITHelper" \
+         "Payload/Henge.app/henge-jit.js"; do
+  if ! unzip -Z -1 "$OUT" | grep -Fqx "$f"; then
+    echo "==> IPA is missing $f; refusing to ship it" >&2
+    rm -f "$OUT"
+    exit 1
+  fi
+done
+echo "==> verified embedded JIT helper and script in IPA (sideloader must preserve .appex)"
 echo "==> $OUT ($(du -h "$OUT" | cut -f1))"
